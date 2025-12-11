@@ -7,6 +7,7 @@ from PyQt6.QtCore import Qt, QSize, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon, QAction
 
 from core.indexer import AppIndexer
+from core.ai import AIHandler
 
 class IndexerThread(QThread):
     finished = pyqtSignal(list)
@@ -15,6 +16,18 @@ class IndexerThread(QThread):
         indexer = AppIndexer()
         apps = indexer.index_apps()
         self.finished.emit(apps)
+
+class AIThread(QThread):
+    finished = pyqtSignal(str)
+
+    def __init__(self, prompt):
+        super().__init__()
+        self.prompt = prompt
+        self.handler = AIHandler()
+
+    def run(self):
+        response = self.handler.ask(self.prompt)
+        self.finished.emit(response)
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -39,7 +52,7 @@ class MainWindow(QMainWindow):
 
         # Search Bar (Top)
         self.search_bar = QLineEdit()
-        self.search_bar.setPlaceholderText("Search apps, 'cb' for clipboard, 'g' for google...")
+        self.search_bar.setPlaceholderText("Search apps, 'cb' for clipboard, 'g' for google, 'ask' for AI...")
         self.search_bar.textChanged.connect(self.filter_items)
         self.search_bar.returnPressed.connect(self.execute_selected)
         self.main_layout.addWidget(self.search_bar)
@@ -66,6 +79,8 @@ class MainWindow(QMainWindow):
         # Data
         self.all_apps = []
         self.indexer = AppIndexer() # Helper for direct calls
+        self.ai_handler = AIHandler()
+        self.ai_thread = None
         
         # Start Indexing
         self.indexer_thread = IndexerThread()
@@ -170,6 +185,8 @@ class MainWindow(QMainWindow):
                 icon = QIcon.fromTheme("web-browser", QIcon.fromTheme("internet-web-browser"))
             elif app['type'] == 'Clipboard':
                 icon = QIcon.fromTheme("edit-paste")
+            elif app['type'] == 'AI':
+                icon = QIcon.fromTheme("preferences-system", QIcon.fromTheme("system-help"))
             else:
                 icon = QIcon.fromTheme(icon_name)
             
@@ -205,6 +222,28 @@ class MainWindow(QMainWindow):
             else:
                 items_to_show.extend(history)
             
+            self.update_list(items_to_show)
+            return
+
+        # AI Mode
+        if lower_text.startswith("ask "):
+            query = text[4:].strip()
+            if query:
+                 items_to_show.append({
+                    'name': f"Ask AI: {query}",
+                    'exec': query,
+                    'icon': 'preferences-system',
+                    'description': 'Send to Gemini AI',
+                    'type': 'AI'
+                })
+            else:
+                 items_to_show.append({
+                    'name': "Ask AI...",
+                    'exec': "",
+                    'icon': 'preferences-system',
+                    'description': 'Type your question',
+                    'type': 'Info'
+                })
             self.update_list(items_to_show)
             return
 
@@ -274,6 +313,17 @@ class MainWindow(QMainWindow):
         if app_data.get('type') == 'Info':
             return
 
+        if app_data['type'] == 'AI':
+            self.details_title.setText("Thinking...")
+            self.details_desc.setText("Waiting for Gemini API response...")
+            self.details_meta.setText("")
+            
+            # Disable interaction while waiting? For now just visual feedback.
+            self.ai_thread = AIThread(app_data['exec'])
+            self.ai_thread.finished.connect(self.on_ai_response)
+            self.ai_thread.start()
+            return
+
         if app_data['type'] in ('Calculator', 'Clipboard'):
             clipboard = QApplication.clipboard()
             clipboard.setText(app_data['exec'])
@@ -291,3 +341,21 @@ class MainWindow(QMainWindow):
                 self.close()
             except Exception as e:
                 print(f"Error launching {app_data['name']}: {e}")
+
+    def on_ai_response(self, response):
+        self.details_title.setText("AI Response")
+        self.details_desc.setText(response)
+        
+        # We can add an option to copy the response to clipboard
+        # Re-using the list item to allow "Enter" to copy result
+        # But for now, just showing it is good.
+        # Let's update the list with the result so they can copy it.
+        
+        result_item = {
+            'name': "Copy Answer",
+            'exec': response,
+            'icon': 'edit-paste',
+            'description': response[:100] + "...",
+            'type': 'Clipboard'
+        }
+        self.update_list([result_item])
