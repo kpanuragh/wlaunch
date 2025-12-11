@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+env/
+venv/
+.env
+
+# Build
+build/
+dist/
+dist_root/
+*.deb
+*.rpm
+*.spec
+wlaunch-linux-x86_64
+
+# IDEs
+.vscode/
+.idea/
+
+# Misc
+.DS_Store
+*.log
+clipboard_history.json

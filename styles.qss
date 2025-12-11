@@ -1,0 +1,72 @@
+/* Global Window Styling */
+QMainWindow {
+    background-color: #1e1e1e;
+    border: 1px solid #333333;
+    border-radius: 12px;
+}
+
+/* Search Input */
+QLineEdit {
+    background-color: #252526;
+    border: none;
+    border-bottom: 1px solid #333333;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    padding: 16px;
+    font-size: 20px;
+    color: #cccccc;
+    selection-background-color: #3e3e42;
+}
+QLineEdit:focus {
+    outline: none;
+}
+
+/* Results List */
+QListWidget {
+    background-color: #1e1e1e;
+    border: none;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+    outline: none;
+}
+
+QListWidget::item {
+    padding: 12px;
+    border-bottom: 1px solid #252526;
+    color: #cccccc;
+}
+
+QListWidget::item:selected {
+    background-color: #37373d; /* Raycast-ish highlight */
+    border-left: 4px solid #cc6633; /* Accent color */
+    color: #ffffff;
+}
+
+/* Details Panel */
+QWidget#DetailsPanel {
+    background-color: #1e1e1e;
+    border-left: 1px solid #333333;
+    border-bottom-right-radius: 12px;
+}
+
+QLabel#DetailsTitle {
+    font-size: 18px;
+    font-weight: bold;
+    color: #ffffff;
+    margin-bottom: 8px;
+}
+
+QLabel#DetailsDesc {
+    font-size: 14px;
+    color: #aaaaaa;
+    margin-bottom: 12px;
+}
+
+QLabel#DetailsMeta {
+    font-family: monospace;
+    font-size: 12px;
+    color: #666666;
+    background-color: #252526;
+    padding: 8px;
+    border-radius: 4px;
+}

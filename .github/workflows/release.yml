@@ -1,0 +1,117 @@
+name: Build and Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ruby ruby-dev rubygems build-essential
+        sudo gem install --no-document fpm
+        pip install PyQt6 pyxdg pyinstaller
+
+    - name: Prepare Build Structure
+      run: |
+        mkdir -p dist_root/usr/bin
+        mkdir -p dist_root/usr/share/wlaunch/core
+        mkdir -p dist_root/usr/share/wlaunch/ui
+        mkdir -p dist_root/usr/lib/systemd/user
+        mkdir -p dist_root/usr/share/applications
+
+        # Copy Source Files
+        cp wlaunch.py styles.qss dist_root/usr/share/wlaunch/
+        cp core/*.py dist_root/usr/share/wlaunch/core/
+        cp ui/*.py dist_root/usr/share/wlaunch/ui/
+
+        # Create Launch Wrappers
+        echo '#!/bin/bash' > dist_root/usr/bin/wlaunch
+        echo 'export PYTHONPATH=/usr/share/wlaunch' >> dist_root/usr/bin/wlaunch
+        echo 'cd /usr/share/wlaunch' >> dist_root/usr/bin/wlaunch
+        echo 'exec python3 wlaunch.py "$@"' >> dist_root/usr/bin/wlaunch
+        chmod +x dist_root/usr/bin/wlaunch
+
+        echo '#!/bin/bash' > dist_root/usr/bin/wlaunch-daemon
+        echo 'export PYTHONPATH=/usr/share/wlaunch' >> dist_root/usr/bin/wlaunch-daemon
+        echo 'cd /usr/share/wlaunch' >> dist_root/usr/bin/wlaunch-daemon
+        echo 'exec python3 core/clipboard_daemon.py' >> dist_root/usr/bin/wlaunch-daemon
+        chmod +x dist_root/usr/bin/wlaunch-daemon
+
+        # Create Systemd Service
+        cat <<EOT > dist_root/usr/lib/systemd/user/wlaunch-daemon.service
+        [Unit]
+        Description=wlaunch Clipboard Daemon
+        After=graphical-session.target
+
+        [Service]
+        ExecStart=/usr/bin/wlaunch-daemon
+        Restart=on-failure
+
+        [Install]
+        WantedBy=default.target
+        EOT
+
+        # Create Desktop Entry
+        cat <<EOT > dist_root/usr/share/applications/wlaunch.desktop
+        [Desktop Entry]
+        Name=wlaunch
+        Comment=Raycast-like launcher
+        Exec=wlaunch
+        Icon=system-search
+        Terminal=false
+        Type=Application
+        Categories=Utility;
+        EOT
+
+    - name: Build DEB Package
+      run: |
+        fpm -s dir -t deb \
+          -n wlaunch \
+          -v ${{ github.event.release.tag_name || '1.0.0' }} \
+          -a all \
+          -m "kpanuragh <git@github.com>" \
+          --description "A Raycast-like launcher for i3" \
+          --depends "python3" \
+          --depends "python3-pyqt6" \
+          --depends "python3-xdg" \
+          -C dist_root .
+
+    - name: Build RPM Package
+      run: |
+        fpm -s dir -t rpm \
+          -n wlaunch \
+          -v ${{ github.event.release.tag_name || '1.0.0' }} \
+          -a all \
+          -m "kpanuragh <git@github.com>" \
+          --description "A Raycast-like launcher for i3" \
+          --depends "python3" \
+          --depends "python3-pyqt6" \
+          --depends "python3-pyxdg" \
+          -C dist_root .
+
+    - name: Build Standalone Executable (PyInstaller)
+      run: |
+        pyinstaller --name wlaunch_bin --onefile --windowed --add-data "styles.qss:." wlaunch.py
+        mv dist/wlaunch_bin wlaunch-linux-x86_64
+
+    - name: Upload Release Assets
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: |
+          *.deb
+          *.rpm
+          wlaunch-linux-x86_64
