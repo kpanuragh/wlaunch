@@ -359,7 +359,7 @@ class MainWindow(QMainWindow):
             'name': "Copy AI Answer",
             'exec': response,
             'icon': 'edit-paste',
-            'description': "Click to copy the full AI response to clipboard.",
+            'description': response,
             'type': 'Clipboard'
         }
         self.update_list([result_item])
