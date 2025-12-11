@@ -14,6 +14,7 @@ A modern, extensible, Raycast-inspired application launcher for Linux (specifica
     *   `gh query...` - GitHub Search
     *   `yt query...` - YouTube Search
 *   **📜 Script Extensions:** Drop any script into `~/.config/wlaunch/scripts/` and it becomes a searchable command.
+*   **🧠 AI Assistant:** Type `ask your question...` to get answers from Google's Gemini AI.
 *   **🖥️ System Commands:** Built-in support for Shutdown, Reboot, Log Out, and i3 Reload.
 *   **🎨 Modern UI:** Frameless, dark-themed, window-centered design with a split-pane details view.
 
@@ -64,6 +65,14 @@ wlaunch-daemon &
 (The package installs a systemd user service for this automatically).
 
 ## Configuration
+*   **AI Assistant Configuration:** To use the AI Assistant feature, you need a Google Gemini API key.
+    1.  Obtain an API key from [Google AI Studio](https://aistudio.google.com/app/apikey).
+    2.  Create a configuration file at `~/.config/wlaunch/config.json` with the following content, replacing `"YOUR_ACTUAL_API_KEY_HERE"` with your obtained key:
+        ```json
+        {
+            "gemini_api_key": "YOUR_ACTUAL_API_KEY_HERE"
+        }
+        ```
 *   **Styles:** Edit `/usr/share/wlaunch/styles.qss` (or local `styles.qss`) to customize the look.
 *   **Scripts:** Put executable files in `~/.config/wlaunch/scripts/`.
 
