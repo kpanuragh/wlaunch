@@ -111,10 +111,10 @@ class MainWindow(QMainWindow):
         self.details_desc = QLabel("")
         self.details_desc.setObjectName("DetailsDesc")
         self.details_desc.setWordWrap(True)
+        self.details_desc.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         layout.addWidget(self.details_desc)
         
-        # Spacer
-        layout.addSpacing(10)
+        # Spacer - removed to allow QLabel to expand fully
 
         # Meta/Command
         self.details_meta = QLabel("")
@@ -122,8 +122,8 @@ class MainWindow(QMainWindow):
         self.details_meta.setWordWrap(True)
         layout.addWidget(self.details_meta)
         
-        # Fill rest
-        layout.addStretch()
+        # Fill rest - removed to allow QLabel to expand fully
+
 
     def update_details(self, current, previous):
         if not current:
@@ -348,14 +348,18 @@ class MainWindow(QMainWindow):
         
         # We can add an option to copy the response to clipboard
         # Re-using the list item to allow "Enter" to copy result
-        # But for now, just showing it is good.
-        # Let's update the list with the result so they can copy it.
-        
+        # If there's an error in the response, don't show the copy option.
+        if response.startswith("Error:"):
+            # If an error occurred, just display it and don't offer to copy.
+            self.search_bar.setText("Error occurred during AI request.")
+            self.update_list([])
+            return
+
         result_item = {
-            'name': "Copy Answer",
+            'name': "Copy AI Answer",
             'exec': response,
             'icon': 'edit-paste',
-            'description': response[:100] + "...",
+            'description': "Click to copy the full AI response to clipboard.",
             'type': 'Clipboard'
         }
         self.update_list([result_item])
