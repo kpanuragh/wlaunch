@@ -4,6 +4,7 @@ from core.config import get_api_key
 class AIHandler:
     def __init__(self):
         self.api_key = get_api_key()
+        self.chat_session = None
         if self.api_key:
             genai.configure(api_key=self.api_key)
             self.model = genai.GenerativeModel('gemini-2.5-flash')
@@ -24,7 +25,13 @@ class AIHandler:
             return "Error: Gemini API Key not found in ~/.config/wlaunch/config.json"
         
         try:
-            response = self.model.generate_content(prompt)
+            if not self.chat_session:
+                self.chat_session = self.model.start_chat(history=[])
+            
+            response = self.chat_session.send_message(prompt)
             return response.text
         except Exception as e:
             return f"Error: {str(e)}"
+
+    def reset_chat(self):
+        self.chat_session = None

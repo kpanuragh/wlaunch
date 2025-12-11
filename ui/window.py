@@ -20,10 +20,10 @@ class IndexerThread(QThread):
 class AIThread(QThread):
     finished = pyqtSignal(str)
 
-    def __init__(self, prompt):
+    def __init__(self, prompt, handler):
         super().__init__()
         self.prompt = prompt
-        self.handler = AIHandler()
+        self.handler = handler
 
     def run(self):
         response = self.handler.ask(self.prompt)
@@ -78,6 +78,7 @@ class MainWindow(QMainWindow):
 
         # Data
         self.all_apps = []
+        self.chat_history_items = []
         self.indexer = AppIndexer() # Helper for direct calls
         self.ai_handler = AIHandler()
         self.ai_thread = None
@@ -225,6 +226,23 @@ class MainWindow(QMainWindow):
             self.update_list(items_to_show)
             return
 
+        # Chat History Mode
+        if lower_text == "chat" or lower_text.startswith("chat "):
+            if not self.chat_history_items:
+                items_to_show.append({
+                    'name': "Chat History is empty",
+                    'exec': "",
+                    'icon': 'preferences-system',
+                    'description': 'Ask something first!',
+                    'type': 'Info'
+                })
+            else:
+                # Reverse to show newest first
+                items_to_show.extend(reversed(self.chat_history_items))
+            
+            self.update_list(items_to_show)
+            return
+
         # AI Mode
         if lower_text.startswith("ask "):
             query = text[4:].strip()
@@ -319,7 +337,7 @@ class MainWindow(QMainWindow):
             self.details_meta.setText("")
             
             # Disable interaction while waiting? For now just visual feedback.
-            self.ai_thread = AIThread(app_data['exec'])
+            self.ai_thread = AIThread(app_data['exec'], self.ai_handler)
             self.ai_thread.finished.connect(self.on_ai_response)
             self.ai_thread.start()
             return
@@ -354,6 +372,17 @@ class MainWindow(QMainWindow):
             self.search_bar.setText("Error occurred during AI request.")
             self.update_list([])
             return
+
+        # Save to history
+        prompt = self.ai_thread.prompt if self.ai_thread else "Unknown Question"
+        history_item = {
+            'name': f"Q: {prompt}",
+            'exec': response,
+            'icon': 'preferences-system',
+            'description': response,
+            'type': 'Clipboard' # Allow copying from history
+        }
+        self.chat_history_items.append(history_item)
 
         result_item = {
             'name': "Copy AI Answer",
