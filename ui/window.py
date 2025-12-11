@@ -2,7 +2,7 @@ import sys
 import subprocess
 import re
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QLineEdit, 
-                             QListWidget, QListWidgetItem, QApplication, QLabel, QHBoxLayout)
+                             QListWidget, QListWidgetItem, QApplication, QLabel, QHBoxLayout, QTextBrowser)
 from PyQt6.QtCore import Qt, QSize, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon, QAction
 
@@ -108,10 +108,10 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.details_title)
 
         # Description
-        self.details_desc = QLabel("")
+        self.details_desc = QTextBrowser()
         self.details_desc.setObjectName("DetailsDesc")
-        self.details_desc.setWordWrap(True)
-        self.details_desc.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.details_desc.setReadOnly(True)
+        self.details_desc.setOpenExternalLinks(True)
         layout.addWidget(self.details_desc)
         
         # Spacer - removed to allow QLabel to expand fully

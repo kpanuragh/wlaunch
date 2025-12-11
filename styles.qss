@@ -56,10 +56,12 @@ QLabel#DetailsTitle {
     margin-bottom: 8px;
 }
 
-QLabel#DetailsDesc {
+QTextBrowser#DetailsDesc {
     font-size: 14px;
     color: #aaaaaa;
     margin-bottom: 12px;
+    border: none;
+    background-color: transparent;
 }
 
 QLabel#DetailsMeta {
