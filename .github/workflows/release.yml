@@ -5,6 +5,9 @@ on:
     types: [published]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -16,6 +19,18 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
+
+    - name: Get Version
+      id: get_version
+      run: |
+        if [ "${{ github.event_name }}" == "release" ]; then
+          VERSION="${{ github.event.release.tag_name }}"
+        else
+          VERSION="1.0.0"
+        fi
+        # Strip 'v' prefix if present
+        VERSION="${VERSION#v}"
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
 
     - name: Install Dependencies
       run: |
@@ -80,7 +95,7 @@ jobs:
       run: |
         fpm -s dir -t deb \
           -n wlaunch \
-          -v ${{ github.event.release.tag_name || '1.0.0' }} \
+          -v ${{ env.VERSION }} \
           -a all \
           -m "kpanuragh <git@github.com>" \
           --description "A Raycast-like launcher for i3" \
@@ -93,7 +108,7 @@ jobs:
       run: |
         fpm -s dir -t rpm \
           -n wlaunch \
-          -v ${{ github.event.release.tag_name || '1.0.0' }} \
+          -v ${{ env.VERSION }} \
           -a all \
           -m "kpanuragh <git@github.com>" \
           --description "A Raycast-like launcher for i3" \
