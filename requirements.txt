@@ -1,3 +1,4 @@
 PyQt6
 pyxdg
 google-generativeai
+PyQt6-QtMultimedia

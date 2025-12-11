@@ -1,13 +1,18 @@
 import sys
 import subprocess
 import re
+import os
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QLineEdit, 
                              QListWidget, QListWidgetItem, QApplication, QLabel, QHBoxLayout, QTextBrowser)
-from PyQt6.QtCore import Qt, QSize, QThread, pyqtSignal
-from PyQt6.QtGui import QIcon, QAction
+from PyQt6.QtCore import Qt, QSize, QThread, pyqtSignal, QUrl
+from PyQt6.QtGui import QIcon, QAction, QPixmap
+from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+from PyQt6.QtMultimediaWidgets import QVideoWidget
 
 from core.indexer import AppIndexer
 from core.ai import AIHandler
+from core.emojis import search_emojis
+from core.files import FileSearcher
 
 class IndexerThread(QThread):
     finished = pyqtSignal(list)
@@ -52,7 +57,7 @@ class MainWindow(QMainWindow):
 
         # Search Bar (Top)
         self.search_bar = QLineEdit()
-        self.search_bar.setPlaceholderText("Search apps, 'cb' for clipboard, 'g' for google, 'ask' for AI...")
+        self.search_bar.setPlaceholderText("Search apps, 'cb' for clipboard, 'g' for google, 'ask' for AI, 'e ' for emoji, 'f ' for files...")
         self.search_bar.textChanged.connect(self.filter_items)
         self.search_bar.returnPressed.connect(self.execute_selected)
         self.main_layout.addWidget(self.search_bar)
@@ -80,6 +85,7 @@ class MainWindow(QMainWindow):
         self.all_apps = []
         self.chat_history_items = []
         self.indexer = AppIndexer() # Helper for direct calls
+        self.file_searcher = FileSearcher()
         self.ai_handler = AIHandler()
         self.ai_thread = None
         
@@ -108,6 +114,25 @@ class MainWindow(QMainWindow):
         self.details_title.setWordWrap(True)
         layout.addWidget(self.details_title)
 
+        # Image Preview Label
+        self.image_preview = QLabel()
+        self.image_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.image_preview.setMinimumHeight(200)
+        self.image_preview.hide()
+        layout.addWidget(self.image_preview)
+
+        # Video Preview Widget
+        self.video_widget = QVideoWidget()
+        self.video_widget.setMinimumHeight(200)
+        self.video_widget.hide()
+        layout.addWidget(self.video_widget)
+
+        # Media Player
+        self.audio_output = QAudioOutput()
+        self.media_player = QMediaPlayer()
+        self.media_player.setAudioOutput(self.audio_output)
+        self.media_player.setVideoOutput(self.video_widget)
+
         # Description
         self.details_desc = QTextBrowser()
         self.details_desc.setObjectName("DetailsDesc")
@@ -127,6 +152,12 @@ class MainWindow(QMainWindow):
 
 
     def update_details(self, current, previous):
+        # Reset Previews
+        self.image_preview.hide()
+        self.video_widget.hide()
+        self.media_player.stop()
+        self.details_desc.show()
+
         if not current:
             self.details_title.setText("")
             self.details_desc.setText("")
@@ -136,7 +167,30 @@ class MainWindow(QMainWindow):
         data = current.data(Qt.ItemDataRole.UserRole)
         
         self.details_title.setText(data['name'])
-        self.details_desc.setText(data.get('description', 'No description'))
+        
+        item_type = data.get('type')
+        
+        if item_type == 'Image':
+            pixmap = QPixmap(data['exec'])
+            if not pixmap.isNull():
+                # Scale nicely
+                scaled = pixmap.scaled(self.image_preview.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                self.image_preview.setPixmap(scaled)
+                self.image_preview.show()
+                self.details_desc.hide()
+            else:
+                self.details_desc.setText("Could not load image preview.")
+                self.details_desc.show()
+        
+        elif item_type == 'Video':
+            self.media_player.setSource(QUrl.fromLocalFile(data['exec']))
+            self.video_widget.show()
+            self.media_player.play()
+            self.details_desc.hide()
+            
+        else:
+            self.details_desc.setText(data.get('description', 'No description'))
+            self.details_desc.show()
         
         # Show Exec command or URL, truncated if too long
         exec_cmd = data.get('exec', '')
@@ -188,6 +242,10 @@ class MainWindow(QMainWindow):
                 icon = QIcon.fromTheme("edit-paste")
             elif app['type'] == 'AI':
                 icon = QIcon.fromTheme("preferences-system", QIcon.fromTheme("system-help"))
+            elif app['type'] == 'Emoji':
+                icon = QIcon.fromTheme("face-smile")
+            elif app['type'] in ('File', 'Image', 'Video'):
+                icon = QIcon.fromTheme(icon_name)
             else:
                 icon = QIcon.fromTheme(icon_name)
             
@@ -223,6 +281,60 @@ class MainWindow(QMainWindow):
             else:
                 items_to_show.extend(history)
             
+            self.update_list(items_to_show)
+            return
+
+        # Emoji Mode
+        if lower_text.startswith("e "):
+            query = lower_text[2:].strip()
+            if query:
+                results = search_emojis(query)
+                for res in results:
+                    items_to_show.append({
+                        'name': f"{res['char']} {res['name']}",
+                        'exec': res['char'],
+                        'icon': 'face-smile', # Fallback icon
+                        'description': res['description'],
+                        'type': 'Emoji'
+                    })
+            else:
+                items_to_show.append({
+                    'name': "Search Emojis...",
+                    'exec': "",
+                    'icon': 'face-smile',
+                    'description': 'Type e.g., "e smile"',
+                    'type': 'Info'
+                })
+            self.update_list(items_to_show)
+            return
+
+        # File Search Mode
+        if lower_text.startswith("f "):
+            query = lower_text[2:].strip()
+            if len(query) >= 2:
+                results = self.file_searcher.search(query)
+                for res in results:
+                    icon_name = 'text-x-generic'
+                    if res['type'] == 'Image':
+                        icon_name = 'image-x-generic'
+                    elif res['type'] == 'Video':
+                        icon_name = 'video-x-generic'
+                    
+                    items_to_show.append({
+                        'name': res['name'],
+                        'exec': res['path'],
+                        'icon': icon_name,
+                        'description': res['path'],
+                        'type': res['type']
+                    })
+            else:
+                 items_to_show.append({
+                    'name': "Search Files...",
+                    'exec': "",
+                    'icon': 'system-search',
+                    'description': 'Type at least 2 chars to search...',
+                    'type': 'Info'
+                })
             self.update_list(items_to_show)
             return
 
@@ -342,14 +454,14 @@ class MainWindow(QMainWindow):
             self.ai_thread.start()
             return
 
-        if app_data['type'] in ('Calculator', 'Clipboard'):
+        if app_data['type'] in ('Calculator', 'Clipboard', 'Emoji'):
             clipboard = QApplication.clipboard()
             clipboard.setText(app_data['exec'])
             print(f"Copied to clipboard: {app_data['exec'][:20]}...")
             self.close()
-        elif app_data['type'] == 'WebSearch':
-            print(f"Opening URL: {app_data['exec']}")
-            # xdg-open works on most Linux systems to open default browser
+        elif app_data['type'] == 'WebSearch' or app_data['type'] in ('File', 'Image', 'Video'):
+            print(f"Opening: {app_data['exec']}")
+            # xdg-open works on most Linux systems to open default browser/files
             subprocess.Popen(['xdg-open', app_data['exec']], start_new_session=True)
             self.close()
         else:
