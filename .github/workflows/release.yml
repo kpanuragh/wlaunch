@@ -93,6 +93,7 @@ jobs:
 
     - name: Build DEB Package
       run: |
+        mkdir -p dist
         fpm -s dir -t deb \
           -n wlaunch \
           -v ${{ env.VERSION }} \
@@ -102,6 +103,7 @@ jobs:
           --depends "python3" \
           --depends "python3-pyqt6" \
           --depends "python3-xdg" \
+          -p dist/wlaunch_${{ env.VERSION }}_all.deb \
           -C dist_root .
 
     - name: Build RPM Package
@@ -115,18 +117,21 @@ jobs:
           --depends "python3" \
           --depends "python3-pyqt6" \
           --depends "python3-pyxdg" \
+          -p dist/wlaunch-${{ env.VERSION }}-1.noarch.rpm \
           -C dist_root .
 
     - name: Build Standalone Executable (PyInstaller)
       run: |
         pyinstaller --name wlaunch_bin --onefile --windowed --add-data "styles.qss:." wlaunch.py
-        mv dist/wlaunch_bin wlaunch-linux-x86_64
+        mv dist/wlaunch_bin dist/wlaunch-linux-x86_64
 
     - name: Upload Release Assets
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         files: |
-          *.deb
-          *.rpm
-          wlaunch-linux-x86_64
+          dist/*.deb
+          dist/*.rpm
+          dist/wlaunch-linux-x86_64
