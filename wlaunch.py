@@ -7,7 +7,9 @@ from ui.window import MainWindow
 def load_stylesheet(app):
     """Loads the QSS stylesheet."""
     try:
-        with open("styles.qss", "r") as f:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        style_path = os.path.join(script_dir, "styles.qss")
+        with open(style_path, "r") as f:
             app.setStyleSheet(f.read())
     except FileNotFoundError:
         print("Warning: styles.qss not found.")
