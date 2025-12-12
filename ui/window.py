@@ -6,7 +6,7 @@ import time
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QLineEdit, 
                              QListWidget, QListWidgetItem, QApplication, QLabel, QHBoxLayout, QTextBrowser)
 from PyQt6.QtCore import Qt, QSize, QThread, pyqtSignal, QUrl
-from PyQt6.QtGui import QIcon, QAction, QPixmap
+from PyQt6.QtGui import QIcon, QAction, QPixmap, QClipboard
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
@@ -456,11 +456,16 @@ class MainWindow(QMainWindow):
             return
 
         if app_data['type'] in ('Calculator', 'Clipboard', 'Emoji'):
+            self.hide() # Hide immediately for responsiveness
             clipboard = QApplication.clipboard()
-            clipboard.setText(app_data['exec'])
-            # Ensure the clipboard event is processed before the app closes
+            clipboard.setText(app_data['exec'], mode=QClipboard.Mode.Clipboard)
+            if clipboard.supportsSelection():
+                clipboard.setText(app_data['exec'], mode=QClipboard.Mode.Selection)
+            
+            # Keep app alive briefly to ensure clipboard manager captures data
             QApplication.processEvents()
-            time.sleep(0.1) # Give time for clipboard manager to grab it
+            time.sleep(0.5)
+            
             print(f"Copied to clipboard: {app_data['exec'][:20]}...")
             self.close()
         elif app_data['type'] == 'WebSearch' or app_data['type'] in ('File', 'Image', 'Video'):
