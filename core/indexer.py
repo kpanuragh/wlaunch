@@ -153,3 +153,9 @@ class AppIndexer:
         parts = exec_cmd.split()
         clean_parts = [p for p in parts if not p.startswith('%')]
         return " ".join(clean_parts)
+
+    def add_recent_file(self, file_path):
+        """Track file in recent history (max 100 items)."""
+        from core.recent_files import RecentFileBrowser
+        browser = RecentFileBrowser()
+        browser.add_recent_file(file_path)
