@@ -3,3 +3,4 @@ pyxdg
 google-generativeai
 requests
 cryptography
+i3ipc

@@ -429,6 +429,31 @@ class MainWindow(QMainWindow):
             self.update_list(items_to_show)
             return
 
+        # System Commands
+        system_cmds = {
+            'shutdown': {'cmd': 'systemctl poweroff', 'icon': 'system-shutdown', 'desc': 'Power off the system'},
+            'reboot': {'cmd': 'systemctl reboot', 'icon': 'system-reboot', 'desc': 'Reboot the system'},
+            'suspend': {'cmd': 'systemctl suspend', 'icon': 'system-suspend', 'desc': 'Suspend the system'},
+            'lock': {'cmd': 'loginctl lock-session', 'icon': 'system-lock-screen', 'desc': 'Lock the screen'},
+            'logout': {'cmd': 'i3-msg exit', 'icon': 'system-log-out', 'desc': 'Exit i3 session'}
+        }
+        
+        matched_sys_cmds = []
+        for cmd_name, cmd_data in system_cmds.items():
+            if cmd_name.startswith(lower_text):
+                 matched_sys_cmds.append({
+                    'name': cmd_name.capitalize(),
+                    'exec': cmd_data['cmd'],
+                    'icon': cmd_data['icon'],
+                    'description': cmd_data['desc'],
+                    'type': 'System'
+                })
+        
+        if matched_sys_cmds:
+            items_to_show.extend(matched_sys_cmds)
+            # If we have an exact match, we might want to prioritize it, but appending works too.
+            # If the user typed "shut", it matches "shutdown".
+
         # 0. Check for Clipboard Mode
         if lower_text == "cb" or lower_text.startswith("cb "):
             history = self.indexer.get_clipboard_history()
@@ -737,6 +762,30 @@ class MainWindow(QMainWindow):
                 except Exception as e:
                     self.details_title.setText("Error")
                     self.details_desc.setText(f"Error killing process: {e}")
+            return
+
+        if app_data['type'] == 'System':
+            cmd = app_data['exec']
+            name = app_data['name']
+            
+            # Show confirmation dialog for power actions
+            if name in ('Shutdown', 'Reboot', 'Logout'):
+                reply = QMessageBox.question(
+                    self,
+                    f"{name}",
+                    f"Are you sure you want to {name.lower()}?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No
+                )
+                if reply != QMessageBox.StandardButton.Yes:
+                    return
+
+            print(f"Executing system command: {cmd}")
+            try:
+                subprocess.Popen(cmd.split(), start_new_session=True)
+                self.close()
+            except Exception as e:
+                print(f"Error executing {name}: {e}")
             return
 
         if app_data['type'] == 'AI':
