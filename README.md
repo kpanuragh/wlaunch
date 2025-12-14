@@ -7,16 +7,31 @@ A Raycast-like launcher for Linux, optimized for i3wm.
 *   **Application Launcher**: Quickly find and launch applications.
 *   **Window Switcher**: Navigate between open windows (requires i3wm).
 *   **Clipboard Manager**: History of copied text.
+*   **Network Manager**: Manage WiFi connections (toggle, connect, scan).
 *   **AI Assistant**: Integration with Google Gemini for quick queries.
-*   **Bitwarden Integration**: Access your passwords directly.
+*   **Bitwarden Integration**: Access your passwords, cards, and secure notes directly.
 *   **Calculator & Converter**: Quick math and unit conversions.
 *   **File Search**: Find recent files.
+*   **Process Manager**: Kill unresponsive processes.
 
 ## Prerequisites
 
-*   Python 3.10 or higher
+### System Dependencies
+Ensure these system packages are installed:
+*   `python` (3.10+)
 *   `git`
-*   A Google Gemini API key (for AI features)
+*   `nmcli` (NetworkManager CLI - for WiFi management)
+*   `libxcb` (Standard Qt dependency on Linux)
+*   `i3` (For window switching features, optional but recommended)
+
+### Python Dependencies
+Installed automatically via `requirements.txt`:
+*   `PyQt6` (GUI Framework)
+*   `pyxdg` (Desktop entry parsing)
+*   `google-generativeai` (AI features)
+*   `requests`
+*   `cryptography`
+*   `i3ipc` (i3 window management)
 
 ## Installation
 
@@ -78,3 +93,39 @@ Add this to your startup script (e.g., i3 config):
 ```bash
 exec --no-startup-id /path/to/wlaunch/wlaunch-daemon.sh
 ```
+
+## Keybindings & Commands
+
+| Mode / Command | Action | Example |
+| :--- | :--- | :--- |
+| **General** | | |
+| `Esc` | Close launcher | |
+| `Enter` | Execute / Open / Copy | |
+| `Up` / `Down` | Navigate list | |
+| **System** | | |
+| `wifi` | **Manage Network**: Toggle On/Off, Scan, Connect | `wifi` |
+| `w <query>` | **Window Switcher**: Search open windows | `w firefox` |
+| `ps <query>` | **Process Manager**: Search and kill processes | `ps chrome` |
+| `shutdown` | Shutdown system | |
+| `reboot` | Reboot system | |
+| `suspend` | Suspend system | |
+| **Productivity** | | |
+| `cb <query>` | **Clipboard History**: Search past copies | `cb url` |
+| `r <query>` | **Recent Files**: Search recently used files | `r report` |
+| `f <query>` | **File Search**: Search files by name | `f photo.jpg` |
+| `ask <query>` | **AI Assistant**: Ask Google Gemini | `ask python list sort` |
+| **Bitwarden** | | |
+| `bw` | **Login/Unlock**: Access vault | `bw` |
+| `bw <query>` | Search Logins (Copy Password/Username) | `bw google` |
+| `bw gen` | Generate secure password | |
+| `bw totp <query>`| Get TOTP code | `bw totp github` |
+| `bw card <query>`| Search Credit Cards | `bw card visa` |
+| `bw note <query>`| Search Secure Notes | `bw note secret` |
+| **Web** | | |
+| `g <query>` | Google Search | `g linux news` |
+| `gh <query>` | GitHub Search | `gh wlaunch` |
+| `yt <query>` | YouTube Search | `yt tutorials` |
+| **Utilities** | | |
+| `e <query>` | **Emoji Picker**: Copy emoji to clipboard | `e smile` |
+| `<math>` | **Calculator**: Evaluate expression | `128 * 4` |
+| `<unit>` | **Converter**: Convert units (e.g. currency) | `100 usd in eur` |

@@ -22,6 +22,7 @@ from core.windows import WindowSwitcher
 from core.recent_files import RecentFileBrowser
 from core.converter import UnitConverter
 from core.processes import ProcessManager
+from core.network import NetworkManager
 
 class IndexerThread(QThread):
     finished = pyqtSignal(list)
@@ -42,6 +43,17 @@ class AIThread(QThread):
     def run(self):
         response = self.handler.ask(self.prompt)
         self.finished.emit(response)
+
+class WifiScanThread(QThread):
+    finished = pyqtSignal(list)
+
+    def __init__(self, manager):
+        super().__init__()
+        self.manager = manager
+
+    def run(self):
+        networks = self.manager.scan()
+        self.finished.emit(networks)
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -66,7 +78,7 @@ class MainWindow(QMainWindow):
 
         # Search Bar (Top)
         self.search_bar = QLineEdit()
-        self.search_bar.setPlaceholderText("Search apps, 'w' for windows, 'r' for recent, 'ps' for processes, 'cb' for clipboard, 'bw' for passwords, 'ask' for AI...")
+        self.search_bar.setPlaceholderText("Search apps, 'w' for windows, 'wifi' for network, 'r' for recent, 'ps' for processes, 'bw' for passwords, 'ask' for AI...")
         self.search_bar.textChanged.connect(self.filter_items)
         self.search_bar.returnPressed.connect(self.execute_selected)
         self.main_layout.addWidget(self.search_bar)
@@ -103,6 +115,10 @@ class MainWindow(QMainWindow):
         self.recent_files = RecentFileBrowser()
         self.converter = UnitConverter()
         self.process_manager = ProcessManager()
+        self.network_manager = NetworkManager()
+        self.wifi_thread = None
+        self.wifi_cache = []
+        self.last_wifi_scan = 0
         
         # Start Indexing
         self.indexer_thread = IndexerThread()
@@ -514,6 +530,76 @@ class MainWindow(QMainWindow):
             self.update_list(items_to_show)
             return
 
+        # Network/Wifi Mode
+        if lower_text == "wifi" or lower_text.startswith("wifi "):
+            if not self.network_manager.is_available():
+                items_to_show.append({
+                    'name': "Network Manager Unavailable",
+                    'exec': "",
+                    'icon': 'network-error',
+                    'description': 'No compatible network backend (nmcli) found.',
+                    'type': 'Info'
+                })
+                self.update_list(items_to_show)
+                return
+
+            # Add toggle option
+            items_to_show.append({
+                'name': "Toggle Wifi On/Off",
+                'exec': "toggle",
+                'icon': 'network-wireless',
+                'description': 'Turn wifi radio on or off',
+                'type': 'WifiToggle'
+            })
+
+            # Handle Scanning
+            current_time = time.time()
+            if not self.wifi_cache or (current_time - self.last_wifi_scan > 10 and lower_text == "wifi"):
+                 # Start scan if cache is old or empty, but only if explicitly asked (to avoid spamming)
+                 if self.wifi_thread is None or not self.wifi_thread.isRunning():
+                    self.wifi_thread = WifiScanThread(self.network_manager)
+                    self.wifi_thread.finished.connect(self.on_wifi_scan_finished)
+                    self.wifi_thread.start()
+                    
+                    # Show scanning indicator if cache is empty
+                    if not self.wifi_cache:
+                        items_to_show.append({
+                            'name': "Scanning for networks...",
+                            'exec': "",
+                            'icon': 'network-wireless-acquiring',
+                            'description': 'Please wait...',
+                            'type': 'Info'
+                        })
+            
+            # Show Cached Results
+            if self.wifi_cache:
+                for net in self.wifi_cache:
+                    # Filter if query provided
+                    query = lower_text[4:].strip()
+                    if query and query not in net['ssid'].lower():
+                        continue
+                        
+                    desc = f"Signal: {net['signal']}% | Security: {net['security']}"
+                    
+                    if net['in_use']:
+                        # Fetch IP details for connected network
+                        details = self.network_manager.get_connection_details()
+                        ip_info = f" | IP: {details.get('ip', 'N/A')} | GW: {details.get('gateway', 'N/A')}"
+                        desc = "CONNECTED" + ip_info + " | " + desc
+                    
+                    items_to_show.append({
+                        'name': net['ssid'],
+                        'exec': net['ssid'],
+                        'icon': 'network-wireless' if not net['in_use'] else 'network-wireless-connected',
+                        'description': desc,
+                        'type': 'WifiConnect',
+                        'security': net['security'],
+                        'in_use': net['in_use']
+                    })
+
+            self.update_list(items_to_show)
+            return
+
         # Emoji Mode
         if lower_text.startswith("e "):
             query = lower_text[2:].strip()
@@ -674,6 +760,13 @@ class MainWindow(QMainWindow):
         
         self.update_list(items_to_show)
 
+    def on_wifi_scan_finished(self, networks):
+        self.wifi_cache = networks
+        self.last_wifi_scan = time.time()
+        # Refresh list if user is still in wifi mode
+        if self.search_bar.text().startswith("wifi"):
+            self.filter_items(self.search_bar.text())
+
     def on_item_clicked(self, item):
         """Handle single click on item"""
         print(f"DEBUG on_item_clicked: item={item.text() if item else None}")
@@ -711,7 +804,57 @@ class MainWindow(QMainWindow):
             return
 
         # Handle Bitwarden unlock FIRST before other types
-        if app_data.get('type') == 'BitwardenUnlock':
+        if app_data['type'] == 'WifiToggle':
+            # This is a bit simplistic, assumes we want to toggle. 
+            # Ideally we check status first. For now, let's just show info or try to toggle on.
+            # Actually, let's just try to restart the network manager or something?
+            # Or asking user what to do.
+            # Let's just run nmcli radio wifi
+            # We can't easily know current state without another command.
+            # Let's assume toggle ON for now or offer choice.
+            reply = QMessageBox.question(
+                self, "Wifi Toggle", "Turn Wifi ON?", 
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            enable = (reply == QMessageBox.StandardButton.Yes)
+            success, msg = self.network_manager.toggle_wifi(enable)
+            QMessageBox.information(self, "Wifi", msg)
+            return
+
+        if app_data['type'] == 'WifiConnect':
+            ssid = app_data['name']
+            if app_data.get('in_use'):
+                QMessageBox.information(self, "Wifi", f"Already connected to {ssid}")
+                return
+
+            password = None
+            security = app_data.get('security', '').lower()
+            if security and security != '--':
+                from PyQt6.QtWidgets import QLineEdit as LineEdit
+                text, ok = QInputDialog.getText(self, "Connect to Wifi", f"Password for {ssid}:", LineEdit.EchoMode.Password)
+                if ok:
+                    password = text
+                else:
+                    return # Cancelled
+            
+            self.details_title.setText("Connecting...")
+            self.details_desc.setText(f"Connecting to {ssid}...")
+            QApplication.processEvents()
+            
+            success, msg = self.network_manager.connect(ssid, password)
+            
+            if success:
+                self.details_title.setText("Connected")
+                self.details_desc.setText(f"Successfully connected to {ssid}")
+                QMessageBox.information(self, "Success", f"Connected to {ssid}")
+                self.close()
+            else:
+                self.details_title.setText("Connection Failed")
+                self.details_desc.setText(msg)
+                QMessageBox.warning(self, "Error", f"Failed to connect: {msg}")
+            return
+
+        if app_data['type'] == 'BitwardenUnlock':
             print("DEBUG: BitwardenUnlock triggered - showing password dialog")
             from PyQt6.QtWidgets import QLineEdit as LineEdit
             text, ok = QInputDialog.getText(self, "Bitwarden Unlock", "Enter Master Password:", LineEdit.EchoMode.Password)
