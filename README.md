@@ -24,7 +24,7 @@ This project is intended to be installed directly via `git clone`.
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/yourusername/wlaunch.git
+    git clone https://github.com/kpanuragh/wlaunch.git
     cd wlaunch
     ```
 
